@@ -199,7 +199,7 @@ execve
 execve
 ```
 
-## 7. Status
+## 10. Status
 
 At this point the system has:
 
