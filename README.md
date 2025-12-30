@@ -106,7 +106,100 @@ This confirms:
 
 ---
 
-## 7. Status
+## 7. Compile and run a simple eBPF program
+
+### hello.bpf.c
+
+```bash
+cat << 'EOF' > hello_execve.bpf.c
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+
+SEC("tracepoint/syscalls/sys_enter_execve")
+int hello_execve(void *ctx)
+{
+    bpf_printk("hello from ebpf: execve called\n");
+    return 0;
+}
+
+char LICENSE[] SEC("license") = "GPL";
+EOF
+
+```
+
+Compile:
+
+```bash
+clang -O2 -g -target bpf -c hello.bpf.c -o hello.bpf.o
+```
+
+Verify:
+
+```bash
+file hello.bpf.o
+```
+
+Expected output along the lines of:
+```
+[benm@localhost ~]$ file hello.bpf.o
+hello.bpf.o: ELF 64-bit LSB relocatable, eBPF, version 1 (SYSV), with debug_info, not stripped
+```
+
+---
+
+## 8. Load the eBPF Program
+
+```bash
+sudo bpftool prog load hello.bpf.o /sys/fs/bpf/hello_execve
+```
+
+Verify program is loaded:
+
+```bash
+sudo bpftool prog show | grep hello
+```
+
+Expected output along the lines of:
+```
+[benm@localhost ~]$ sudo bpftool prog show | grep hello
+48: tracepoint  name hello_execve  tag 7c36a23f8d1b6b84  gpl
+```
+
+---
+
+## 9. Validate with bpftrace (Key Sanity Check)
+
+This step definitively proved that eBPF execution works:
+
+Install `bpfrace`:
+
+```bash
+sudo dnf install -y bpftrace
+```
+
+Open 2 terminals.
+
+In terminal 1:
+```bash
+sudo bpftrace -e 'tracepoint:syscalls:sys_enter_execve { printf("execve\n"); }'
+```
+
+In terminal 2:
+```bash
+ls
+echo
+```
+
+Example output in terminal 1:
+
+```
+Attaching 1 probe...
+execve
+execve
+execve
+```
+
+## 10. Status
 
 At this point the system has:
 
