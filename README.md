@@ -212,16 +212,7 @@ At this point the system has:
 
 ---
 
-## Next Steps (Detailed below)
-
-- Deploy and configure **bpfman**
-- Load eBPF programs declaratively via CRDs
-- Demonstrate enable/disable per node
-- Optional: LSM, tracing, or networking programs
-
 # bpfman
-
-To replicate a production-like deployment (and to keep life simple) we will use an official redhat bpfman image.
 
 ## 1. Authenticate to Red Hat Container Registry
 
@@ -258,4 +249,12 @@ Confirmed: container runs and exposes the bpfman RPC service.
 
 ---
 
+# Projects
 
+## bpfman Proof of Concept
+See the [bpfman demo README](./bpfman-podman-demo/README.md) for complete documentation.
+
+Key features:
+- Validates bpfman in containerized environment
+- Proves OpenShift deployment requirements
+- Includes security approval documentation
