@@ -212,10 +212,49 @@ At this point the system has:
 
 ---
 
-## Next Steps (Not Yet Performed)
+# bpfman
 
-- Deploy and configure **bpfman**
-- Load eBPF programs declaratively via CRDs
-- Demonstrate enable/disable per node
-- Optional: LSM, tracing, or networking programs
+## 1. Authenticate to Red Hat Container Registry
 
+Login to the Red Hat registry (required for `bpfman` images):
+
+```bash
+sudo podman login registry.redhat.io
+```
+
+Uses Red Hat Customer Portal credentials.
+
+---
+
+## 2. Pull Official bpfman Images
+
+Pull a known-good version (0.5.9):
+
+```bash
+sudo podman pull registry.redhat.io/bpfman/bpfman:0.5.9
+sudo podman pull registry.redhat.io/bpfman/bpfman-agent:0.5.9
+```
+
+Verify `bpfman` image:
+
+```bash
+sudo podman run --rm -it \
+  --privileged \
+  --pid=host \
+  --network=host \
+  registry.redhat.io/bpfman/bpfman:0.5.9 --help
+```
+
+Confirmed: container runs and exposes the bpfman RPC service.
+
+---
+
+# Projects
+
+## bpfman Proof of Concept
+See the [bpfman demo README](./bpfman-podman-demo/README.md) for complete documentation.
+
+Key features:
+- Validates bpfman in containerized environment
+- Proves OpenShift deployment requirements
+- Includes security approval documentation
