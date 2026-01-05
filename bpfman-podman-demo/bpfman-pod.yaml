@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bpfman-demo-pod
+  labels:
+    app: bpfman
+spec:
+  hostNetwork: true
+  hostPID: true
+  containers:
+  - name: bpfman
+    image: registry.redhat.io/bpfman/bpfman:0.5.9
+    securityContext:
+      privileged: true
+      seLinuxOptions:
+        type: spc_t
+      capabilities:
+        add:
+        - SYS_ADMIN
+        - NET_ADMIN
+        - BPF
+        - SYS_RESOURCE
+    env:
+    - name: RUST_LOG
+      value: "info"
+    volumeMounts:
+    - name: bpffs
+      mountPath: /sys/fs/bpf
+    - name: debugfs
+      mountPath: /sys/kernel/debug
+      readOnly: true
+    - name: modules
+      mountPath: /lib/modules
+      readOnly: true
+    - name: bpfman-sock
+      mountPath: /run/bpfman-sock
+  - name: bpfman-agent
+    image: registry.redhat.io/bpfman/bpfman-agent:0.5.9
+    command: ["/bin/sleep", "infinity"]
+    securityContext:
+      privileged: true
+    env:
+    - name: BPFMAN_SOCKET_PATH
+      value: "/run/bpfman-sock/bpfman.sock"
+    volumeMounts:
+    - name: bpfman-sock
+      mountPath: /run/bpfman-sock
+  volumes:
+  - name: bpffs
+    hostPath:
+      path: /sys/fs/bpf
+      type: DirectoryOrCreate
+  - name: debugfs
+    hostPath:
+      path: /sys/kernel/debug
+      type: Directory
+  - name: modules
+    hostPath:
+      path: /lib/modules
+      type: Directory
+  - name: bpfman-sock
+    emptyDir: {}

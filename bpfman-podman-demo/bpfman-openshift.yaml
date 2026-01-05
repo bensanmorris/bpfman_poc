@@ -1,0 +1,157 @@
+---
+# Custom Security Context Constraint for bpfman
+# This is what you'd request from OpenShift cluster admins
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: bpfman-scc
+  annotations:
+    kubernetes.io/description: "SCC for bpfman eBPF management"
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: true
+allowHostPID: true
+allowHostPorts: true
+allowPrivilegedContainer: true
+allowPrivilegeEscalation: true
+allowedCapabilities:
+- SYS_ADMIN
+- NET_ADMIN
+- BPF
+- SYS_RESOURCE
+- PERFMON
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities: null
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- hostPath
+- persistentVolumeClaim
+- projected
+- secret
+users:
+- system:serviceaccount:bpfman:bpfman
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bpfman
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bpfman
+  namespace: bpfman
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: bpfman
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["security.openshift.io"]
+  resources: ["securitycontextconstraints"]
+  resourceNames: ["bpfman-scc"]
+  verbs: ["use"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: bpfman
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: bpfman
+subjects:
+- kind: ServiceAccount
+  name: bpfman
+  namespace: bpfman
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: bpfman
+  namespace: bpfman
+  labels:
+    app: bpfman
+spec:
+  selector:
+    matchLabels:
+      app: bpfman
+  template:
+    metadata:
+      labels:
+        app: bpfman
+      annotations:
+        openshift.io/scc: bpfman-scc
+    spec:
+      serviceAccountName: bpfman
+      hostNetwork: true
+      hostPID: true
+      containers:
+      - name: bpfman
+        image: quay.io/bpfman/bpfman:latest
+        command: ["bpfman", "system", "service"]
+        securityContext:
+          privileged: true
+          runAsUser: 0
+          capabilities:
+            add:
+            - SYS_ADMIN
+            - NET_ADMIN
+            - BPF
+            - SYS_RESOURCE
+          seLinuxOptions:
+            type: spc_t
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: RUST_LOG
+          value: "info"
+        volumeMounts:
+        - name: bpffs
+          mountPath: /sys/fs/bpf
+          mountPropagation: Bidirectional
+        - name: debugfs
+          mountPath: /sys/kernel/debug
+          readOnly: true
+        - name: modules
+          mountPath: /lib/modules
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: bpffs
+        hostPath:
+          path: /sys/fs/bpf
+          type: DirectoryOrCreate
+      - name: debugfs
+        hostPath:
+          path: /sys/kernel/debug
+          type: Directory
+      - name: modules
+        hostPath:
+          path: /lib/modules
+          type: Directory
+      tolerations:
+      - operator: Exists
