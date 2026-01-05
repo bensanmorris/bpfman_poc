@@ -382,11 +382,9 @@ spec:
 
 ## Contact
 
-**Technical Lead**: [Your Name]
-**Team**: [Your Team]
-**Email**: [Your Email]
-**Slack**: #[your-channel]
-**Escalation**: [Manager Name]
+**Technical Lead**: Ben Morris
+**Team**: SRECore
+**Email**: bensan.morris@googlemail.com
 
 ---
 
