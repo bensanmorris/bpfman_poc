@@ -36,17 +36,47 @@ fi
 
 echo -e "${GREEN}✓ Build tools available${NC}"
 echo "  clang: $(clang --version | head -1)"
-echo "  llvm: $(llc --version | head -1)"
 echo ""
 
 # Check kernel headers
-echo "2. Checking kernel headers..."
+echo "2. Checking kernel headers and dependencies..."
 KERNEL_VER=$(uname -r)
-if [ -d "/lib/modules/$KERNEL_VER/build" ]; then
-    echo -e "${GREEN}✓ Kernel headers found for $KERNEL_VER${NC}"
-else
+INSTALL_NEEDED=""
+
+if [ ! -d "/lib/modules/$KERNEL_VER/build" ]; then
     echo -e "${YELLOW}⚠ Kernel headers not found${NC}"
-    echo "Install: sudo dnf install -y kernel-devel-$KERNEL_VER"
+    INSTALL_NEEDED="$INSTALL_NEEDED kernel-devel-$KERNEL_VER"
+fi
+
+# Check for glibc-devel.i686 (needed for 32-bit stubs)
+if [ ! -f "/usr/include/gnu/stubs-32.h" ]; then
+    echo -e "${YELLOW}⚠ 32-bit glibc headers not found${NC}"
+    INSTALL_NEEDED="$INSTALL_NEEDED glibc-devel.i686"
+fi
+
+# Check for bpf headers
+if [ ! -d "/usr/include/bpf" ]; then
+    echo -e "${YELLOW}⚠ BPF headers not found${NC}"
+    INSTALL_NEEDED="$INSTALL_NEEDED libbpf-devel"
+fi
+
+if [ ! -z "$INSTALL_NEEDED" ]; then
+    echo ""
+    echo "Missing packages. Install with:"
+    echo "  sudo dnf install -y $INSTALL_NEEDED"
+    echo ""
+    read -p "Install missing packages now? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        sudo dnf install -y $INSTALL_NEEDED
+        echo ""
+        echo -e "${GREEN}✓ Dependencies installed${NC}"
+    else
+        echo "Cannot compile without dependencies."
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✓ All dependencies present${NC}"
 fi
 echo ""
 
@@ -54,7 +84,7 @@ echo ""
 echo "3. Compiling XDP program..."
 clang -O2 -g \
     -target bpf \
-    -D__TARGET_ARCH_x86 \
+    -D__TARGET_ARCH_x86_64 \
     -I/usr/include/bpf \
     -c xdp_block_ping.c \
     -o xdp_block_ping.o
