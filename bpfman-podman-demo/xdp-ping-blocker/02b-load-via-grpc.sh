@@ -106,7 +106,7 @@ if [ ! -z "$CONTAINER_PID" ] && [ "$CONTAINER_PID" != "0" ]; then
     echo "   Container PID: $CONTAINER_PID"
     
     # Quick test - can we reach the socket?
-    TEST_RESULT=$(timeout 5 sudo nsenter -t $CONTAINER_PID -n -U \
+    TEST_RESULT=$(timeout 5 sudo nsenter -t $CONTAINER_PID -n \
         grpcurl -plaintext -unix $SOCKET_PATH list 2>&1)
     
     if [ $? -eq 0 ]; then
@@ -151,7 +151,7 @@ if [ ! -z "$CONTAINER_PID" ] && [ "$CONTAINER_PID" != "0" ]; then
     set +e
     
     # Use timeout to prevent hanging and capture both stdout and stderr
-    LOAD_RESPONSE=$(timeout 10 sudo nsenter -t $CONTAINER_PID -n -U \
+    LOAD_RESPONSE=$(timeout 10 sudo nsenter -t $CONTAINER_PID -n \
         grpcurl -plaintext -unix $SOCKET_PATH \
         -d @/tmp/xdp_load_request.json \
         bpfman.v1.Bpfman/Load 2>&1)
