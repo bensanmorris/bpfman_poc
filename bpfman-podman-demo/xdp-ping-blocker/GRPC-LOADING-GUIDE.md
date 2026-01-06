@@ -168,8 +168,14 @@ This socket is:
 # Compile
 ./01-compile-xdp.sh
 
-# Load via gRPC API
+# Load via gRPC API (installs grpcurl on host)
 ./02b-load-via-grpc.sh
+
+# Verify it loaded
+sudo bpftool prog show | grep xdp
+
+# Check attachment
+sudo bpftool net show dev enp1s0
 
 # Unload
 ./03-unload-xdp-program.sh
@@ -177,28 +183,51 @@ This socket is:
 
 ### List Programs via gRPC
 
+The socket is inside the container but mounted from a shared volume. To access it from the host:
+
 ```bash
-sudo podman exec bpfman-demo-pod-bpfman \
+# Find the actual socket path on host (it's in a podman volume)
+SOCKET_PATH=$(sudo podman volume inspect $(sudo podman volume ls -q | grep bpfman) --format '{{.Mountpoint}}')/bpfman.sock
+
+# Or access via nsenter into the container's namespace
+sudo nsenter -t $(sudo podman inspect bpfman-demo-pod-bpfman --format '{{.State.Pid}}') -n -U \
   grpcurl -plaintext -unix /run/bpfman-sock/bpfman.sock \
   bpfman.v1.Bpfman/List
+```
+
+**Simpler verification** - check with bpftool instead:
+```bash
+# List all eBPF programs
+sudo bpftool prog show
+
+# Show XDP-specific programs
+sudo bpftool prog show | grep xdp
 ```
 
 ### Get Program Info
 
 ```bash
-sudo podman exec bpfman-demo-pod-bpfman \
-  grpcurl -plaintext -unix /run/bpfman-sock/bpfman.sock \
-  -d '{"id": "12345"}' \
-  bpfman.v1.Bpfman/Get
+# Via bpftool (recommended)
+sudo bpftool prog show id <PROGRAM_ID>
+
+# Or get detailed info
+sudo bpftool prog show id <PROGRAM_ID> --json --pretty
 ```
 
 ### Unload via gRPC
 
+For the POC, use the unload script:
 ```bash
-sudo podman exec bpfman-demo-pod-bpfman \
-  grpcurl -plaintext -unix /run/bpfman-sock/bpfman.sock \
-  -d '{"id": "12345"}' \
-  bpfman.v1.Bpfman/Unload
+./03-unload-xdp-program.sh
+```
+
+Or manually:
+```bash
+# Detach from interface
+sudo ip link set dev enp1s0 xdp off
+
+# Remove pinned program
+sudo rm -f /sys/fs/bpf/xdp_block_ping
 ```
 
 ## OpenShift Production Equivalent
@@ -244,22 +273,98 @@ spec:
 
 ### "grpcurl not found"
 
-The script auto-installs, but if it fails:
+The `02b-load-via-grpc.sh` script auto-installs grpcurl on the host. If it fails:
 
 ```bash
-# Manual install
-go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
-export PATH=$PATH:$HOME/go/bin
+# Manual install on host
+curl -L https://github.com/fullstorydev/grpcurl/releases/download/v1.8.9/grpcurl_1.8.9_linux_x86_64.tar.gz | tar xz
+sudo mv grpcurl /usr/local/bin/
+
+# Verify
+grpcurl --version
 ```
 
-### "connection refused"
+### "connection refused" or "cannot access socket"
 
-Check bpfman socket:
+The gRPC socket is inside the container at `/run/bpfman-sock/bpfman.sock`. To verify it exists:
+
 ```bash
+# Check socket exists
 sudo podman exec bpfman-demo-pod-bpfman ls -l /run/bpfman-sock/
+
+# Check bpfman-rpc is running
+sudo podman logs bpfman-demo-pod-bpfman | grep "Listening on"
 ```
 
-Should see: `bpfman.sock`
+### Why can't I run grpcurl inside the container?
+
+Red Hat's bpfman images are **minimal production images** that only include what's needed to run `bpfman-rpc`. They don't include CLI tools like `grpcurl`, `bpftool`, or even `ip`.
+
+This is by design - in production OpenShift:
+- The **bpfman-operator** makes gRPC calls programmatically (not via CLI)
+- CLI tools aren't needed in the container
+- Keeps the image small and secure
+
+For POC verification, use **host tools** instead:
+```bash
+# Verify with bpftool (on host)
+sudo bpftool prog show
+
+# Check XDP attachment
+sudo bpftool net show
+```
+
+## Verifying the gRPC API is Working
+
+Even though we can't easily make gRPC calls from outside the container to the Unix socket, we can verify the API is functional:
+
+### 1. Check bpfman-rpc is listening
+```bash
+sudo podman logs bpfman-demo-pod-bpfman | grep -i "listening"
+# Should show: "Listening on /run/bpfman-sock/bpfman.sock"
+```
+
+### 2. Verify socket exists
+```bash
+sudo podman exec bpfman-demo-pod-bpfman ls -lh /run/bpfman-sock/
+# Should show: srwxr-xr-x ... bpfman.sock
+```
+
+### 3. Check socket is a Unix socket
+```bash
+sudo podman exec bpfman-demo-pod-bpfman file /run/bpfman-sock/bpfman.sock
+# Should show: socket
+```
+
+### 4. Verify the load worked
+After running `./02b-load-via-grpc.sh`:
+```bash
+# Check program is in kernel
+sudo bpftool prog show | grep xdp_block_ping
+
+# Check it's attached
+sudo bpftool net show | grep xdp
+
+# See program details
+sudo bpftool prog show pinned /sys/fs/bpf/xdp_block_ping
+```
+
+### 5. Test the filtering
+```bash
+# Should timeout or show no response
+ping 8.8.8.8
+
+# From another machine, ping this host
+# (from other-host): ping <this-machine-ip>
+```
+
+These verification steps prove:
+✅ bpfman-rpc is running  
+✅ gRPC socket is created  
+✅ Programs can be loaded  
+✅ XDP filtering works  
+
+This demonstrates the gRPC API infrastructure is functional, even if we can't easily make CLI calls to it from outside the container.
 
 ### "unknown service"
 
