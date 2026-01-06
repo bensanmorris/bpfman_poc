@@ -102,12 +102,20 @@ echo ""
 echo "7. Discovering bpfman gRPC API..."
 echo "   Testing gRPC connectivity..."
 CONTAINER_PID=$(sudo podman inspect bpfman-demo-pod-bpfman --format '{{.State.Pid}}')
+
+# Find grpcurl location
+GRPCURL_PATH=$(command -v grpcurl)
+if [ -z "$GRPCURL_PATH" ]; then
+    GRPCURL_PATH="/usr/local/bin/grpcurl"
+fi
+echo "   grpcurl path: $GRPCURL_PATH"
+
 if [ ! -z "$CONTAINER_PID" ] && [ "$CONTAINER_PID" != "0" ]; then
     echo "   Container PID: $CONTAINER_PID"
     
     # Quick test - can we reach the socket?
     TEST_RESULT=$(timeout 5 sudo nsenter -t $CONTAINER_PID -n \
-        grpcurl -plaintext -unix $SOCKET_PATH list 2>&1)
+        $GRPCURL_PATH -plaintext -unix $SOCKET_PATH list 2>&1)
     
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}   ✓ gRPC connectivity working${NC}"
@@ -152,7 +160,7 @@ if [ ! -z "$CONTAINER_PID" ] && [ "$CONTAINER_PID" != "0" ]; then
     
     # Use timeout to prevent hanging and capture both stdout and stderr
     LOAD_RESPONSE=$(timeout 10 sudo nsenter -t $CONTAINER_PID -n \
-        grpcurl -plaintext -unix $SOCKET_PATH \
+        $GRPCURL_PATH -plaintext -unix $SOCKET_PATH \
         -d @/tmp/xdp_load_request.json \
         bpfman.v1.Bpfman/Load 2>&1)
     
@@ -225,6 +233,12 @@ if [ $LOAD_STATUS -ne 0 ]; then
     
     # Attach to interface
     echo "10. Attaching XDP program to $INTERFACE..."
+    
+    # Clean up any existing XDP first
+    sudo ip link set dev $INTERFACE xdp off 2>/dev/null || true
+    sudo ip link set dev $INTERFACE xdpgeneric off 2>/dev/null || true
+    sleep 1
+    
     if sudo bpftool net attach xdp id $PROGRAM_ID dev $INTERFACE 2>&1; then
         echo -e "${GREEN}✓ XDP attached${NC}"
     elif sudo ip link set dev $INTERFACE xdp pinned /sys/fs/bpf/xdp_block_ping 2>&1; then
