@@ -159,9 +159,8 @@ if [ ! -z "$CONTAINER_PID" ] && [ "$CONTAINER_PID" != "0" ]; then
     set +e
     
     # Use timeout to prevent hanging and capture both stdout and stderr
-    # Pass JSON via stdin instead of file to avoid namespace issues
-    LOAD_RESPONSE=$(timeout 10 sudo nsenter -t $CONTAINER_PID -n bash -c \
-        "cat /tmp/xdp_load_request.json | $GRPCURL_PATH -plaintext -unix $SOCKET_PATH -d @ bpfman.v1.Bpfman/Load" 2>&1)
+    # Pass JSON directly via here-doc
+    LOAD_RESPONSE=$(timeout 10 sudo nsenter -t $CONTAINER_PID -n $GRPCURL_PATH -plaintext -unix $SOCKET_PATH -d @ bpfman.v1.Bpfman/Load <<< "$(cat /tmp/xdp_load_request.json)" 2>&1)
     
     LOAD_STATUS=$?
     
