@@ -1,7 +1,8 @@
 #!/bin/bash
 # Load XDP program via bpfman gRPC API using grpcurl
 
-set -e
+# Don't exit on error - we want to see all errors and handle them
+# set -e
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -99,15 +100,25 @@ echo ""
 
 # List available services (if possible)
 echo "7. Discovering bpfman gRPC API..."
-echo "   Available services:"
+echo "   Testing gRPC connectivity..."
 CONTAINER_PID=$(sudo podman inspect bpfman-demo-pod-bpfman --format '{{.State.Pid}}')
 if [ ! -z "$CONTAINER_PID" ] && [ "$CONTAINER_PID" != "0" ]; then
-    # Try to list services by entering container namespace
-    sudo nsenter -t $CONTAINER_PID -n -U grpcurl -plaintext -unix $SOCKET_PATH list 2>/dev/null || {
-        echo "   (Unable to list from host - socket in container namespace)"
-    }
+    echo "   Container PID: $CONTAINER_PID"
+    
+    # Quick test - can we reach the socket?
+    TEST_RESULT=$(timeout 5 sudo nsenter -t $CONTAINER_PID -n -U \
+        grpcurl -plaintext -unix $SOCKET_PATH list 2>&1)
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}   ✓ gRPC connectivity working${NC}"
+        echo "   Available services:"
+        echo "$TEST_RESULT" | sed 's/^/     /'
+    else
+        echo -e "${YELLOW}   ⚠ Cannot list services${NC}"
+        echo "   This may be normal - bpfman API might not support reflection"
+    fi
 else
-    echo "   (Unable to list - using known API)"
+    echo "   (Cannot get container PID - using known API)"
 fi
 echo ""
 
@@ -136,14 +147,27 @@ echo ""
 # Try to make gRPC call by entering container namespace
 echo "   Attempting gRPC call via container namespace..."
 if [ ! -z "$CONTAINER_PID" ] && [ "$CONTAINER_PID" != "0" ]; then
-    LOAD_RESPONSE=$(sudo nsenter -t $CONTAINER_PID -n -U \
+    # Temporarily disable exit-on-error to capture output
+    set +e
+    
+    # Use timeout to prevent hanging and capture both stdout and stderr
+    LOAD_RESPONSE=$(timeout 10 sudo nsenter -t $CONTAINER_PID -n -U \
         grpcurl -plaintext -unix $SOCKET_PATH \
         -d @/tmp/xdp_load_request.json \
         bpfman.v1.Bpfman/Load 2>&1)
     
     LOAD_STATUS=$?
     
-    if [ $LOAD_STATUS -eq 0 ]; then
+    # Re-enable exit-on-error
+    set -e
+    
+    echo "   gRPC call completed with exit code: $LOAD_STATUS"
+    echo ""
+    
+    if [ $LOAD_STATUS -eq 124 ]; then
+        echo -e "${YELLOW}⚠ gRPC call timed out after 10 seconds${NC}"
+        echo "   This usually means the API endpoint doesn't exist or isn't responding"
+    elif [ $LOAD_STATUS -eq 0 ]; then
         echo -e "${GREEN}✓ gRPC call successful!${NC}"
         echo ""
         echo "Response:"
@@ -156,12 +180,14 @@ if [ ! -z "$CONTAINER_PID" ] && [ "$CONTAINER_PID" != "0" ]; then
             echo "Program ID: $PROGRAM_ID"
         fi
     else
-        echo -e "${YELLOW}⚠ gRPC call failed or returned error${NC}"
-        echo "Response:"
+        echo -e "${YELLOW}⚠ gRPC call failed (exit code: $LOAD_STATUS)${NC}"
+        echo ""
+        echo "Full response/error:"
+        echo "---"
         echo "$LOAD_RESPONSE"
+        echo "---"
         echo ""
         echo -e "${YELLOW}Falling back to direct bpftool load...${NC}"
-        LOAD_STATUS=1
     fi
 else
     echo -e "${YELLOW}⚠ Cannot access container namespace${NC}"
