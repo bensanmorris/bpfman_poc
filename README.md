@@ -1,3 +1,9 @@
+# Revision history
+
+- **UPDATE:** [eBPF use case list added here](./README_ebpf-use-cases-beyond-networking.md)
+- **UPDATE:** [bpfman as a container demo added here](./bpfman-podman-demo/README.md)
+- **UPDATE:** [xdp ping blocker demo added here](./bpfman-podman-demo/xdp-ping-blocker/README.md)
+
 # bpfman Proof of Concept – RHEL 9 (Minimal Setup)
 
 This README documents the **minimal, working setup steps** required to prepare a Red Hat Enterprise Linux 9 system for a **bpfman / eBPF proof of concept**.
