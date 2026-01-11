@@ -2,7 +2,8 @@
 
 - **UPDATE:** [eBPF use case list added here](./README_ebpf-use-cases-beyond-networking.md)
 - **UPDATE:** [bpfman as a container demo added here](./bpfman-podman-demo/README.md)
-- **UPDATE:** [xdp ping blocker demo added here](./bpfman-podman-demo/xdp-ping-blocker/README.md)
+- **UPDATE:** [xdp packet counter demo added here (a good single machine demo)](./bpfman-podman-demo/xdp-packet-counter/README.md)
+- **UPDATE:** [xdp ping blocker demo added here (this demo requires 2 machines)](./bpfman-podman-demo/xdp-ping-blocker/README.md)
 
 # bpfman Proof of Concept – RHEL 9 (Minimal Setup)
 
