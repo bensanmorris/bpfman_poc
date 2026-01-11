@@ -111,7 +111,7 @@ This confirms:
 ### hello.bpf.c
 
 ```bash
-cat << 'EOF' > hello_execve.bpf.c
+cat << 'EOF' > hello.bpf.c
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 
