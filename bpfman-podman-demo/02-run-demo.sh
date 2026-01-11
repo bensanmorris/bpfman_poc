@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run complete bpfman demo with podman and Red Hat registry
-# Fixed version - uses Red Hat image with no command override
+# Fixed version - uses Red Hat image with proper registry authentication
 
 set -e
 
@@ -25,21 +25,43 @@ fi
 echo "Using: $(podman --version)"
 echo ""
 
+# Get Red Hat username
+echo "1. Red Hat Registry Authentication"
+echo ""
+echo "Please enter your Red Hat registry username"
+echo "(This is your Red Hat account username for registry.redhat.io)"
+echo ""
+read -p "Red Hat username: " REDHAT_USERNAME
+
+if [ -z "$REDHAT_USERNAME" ]; then
+    echo -e "${RED}Error: Username cannot be empty${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}Using Red Hat username: $REDHAT_USERNAME${NC}"
+echo ""
+
 # Check for Red Hat registry login
-echo "1. Checking Red Hat registry authentication..."
-if sudo podman login --get-login registry.redhat.io &>/dev/null; then
-    echo -e "${GREEN}✓ Logged into registry.redhat.io${NC}"
+echo "2. Checking Red Hat registry authentication..."
+echo ""
+
+# Check if already logged in as root (since we'll use sudo podman)
+if sudo podman login --get-login registry.redhat.io 2>/dev/null | grep -q "^${REDHAT_USERNAME}$"; then
+    echo -e "${GREEN}✓ Already logged into registry.redhat.io as $REDHAT_USERNAME${NC}"
 else
-    echo -e "${YELLOW}⚠ Not logged into registry.redhat.io${NC}"
+    echo -e "${YELLOW}⚠ Not logged into registry.redhat.io (or wrong username)${NC}"
     echo ""
     echo "Red Hat registry authentication required for bpfman images."
+    echo "You will be prompted for your Red Hat account password."
     echo ""
-    read -p "Login to registry.redhat.io now? (y/n) " -n 1 -r
+    read -p "Login to registry.redhat.io as $REDHAT_USERNAME? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo ""
-        echo "Enter your Red Hat credentials:"
-        sudo podman login registry.redhat.io
+        echo "Logging in as: $REDHAT_USERNAME"
+        echo "Enter your Red Hat password:"
+        sudo podman login registry.redhat.io --username "$REDHAT_USERNAME"
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}✓ Login successful${NC}"
         else
@@ -50,14 +72,14 @@ else
         echo "Cannot proceed without registry access."
         echo ""
         echo "To login manually:"
-        echo "  sudo podman login registry.redhat.io"
+        echo "  sudo podman login registry.redhat.io --username $REDHAT_USERNAME"
         exit 1
     fi
 fi
 echo ""
 
 # Pull the bpfman image
-echo "2. Pulling bpfman image from Red Hat registry..."
+echo "3. Pulling bpfman image from Red Hat registry..."
 echo "   (Cached if already downloaded)"
 if sudo podman pull registry.redhat.io/bpfman/bpfman:0.5.9; then
     echo -e "${GREEN}✓ Image ready${NC}"
@@ -69,7 +91,7 @@ fi
 echo ""
 
 # Check SELinux status
-echo "3. Checking SELinux status..."
+echo "4. Checking SELinux status..."
 if command -v getenforce &> /dev/null; then
     SELINUX_STATUS=$(getenforce)
     echo "   SELinux: $SELINUX_STATUS"
@@ -80,7 +102,7 @@ fi
 echo ""
 
 # Clean up previous runs
-echo "4. Cleaning up any previous runs..."
+echo "5. Cleaning up any previous runs..."
 podman pod rm -f bpfman-demo-pod 2>/dev/null || true
 sudo podman pod rm -f bpfman-demo-pod 2>/dev/null || true
 sleep 2
@@ -88,7 +110,7 @@ echo -e "${GREEN}✓ Clean${NC}"
 echo ""
 
 # Create pod configuration with Red Hat image (NO ARGS!)
-echo "5. Creating bpfman pod configuration..."
+echo "6. Creating bpfman pod configuration..."
 cat > bpfman-pod.yaml << 'EOFPOD'
 apiVersion: v1
 kind: Pod
@@ -158,7 +180,7 @@ echo -e "${GREEN}✓ Configuration created (bpfman + bpfman-agent with shared so
 echo ""
 
 # Deploy with sudo
-echo "6. Deploying bpfman pod..."
+echo "7. Deploying bpfman pod..."
 sudo podman play kube bpfman-pod.yaml
 echo -e "${GREEN}✓ Pod deployed${NC}"
 echo ""
@@ -166,7 +188,7 @@ echo ""
 PODMAN="sudo podman"
 
 # Wait for startup
-echo "7. Waiting for bpfman to start..."
+echo "8. Waiting for bpfman to start..."
 sleep 5
 
 READY=false
@@ -187,7 +209,7 @@ if [ "$READY" = false ]; then
 fi
 
 # Show status
-echo "8. Pod Status:"
+echo "9. Pod Status:"
 echo ""
 $PODMAN pod ps --filter name=bpfman-demo-pod
 echo ""
@@ -195,14 +217,14 @@ $PODMAN ps --filter pod=bpfman-demo-pod
 echo ""
 
 # Show bpfman-rpc is running and listening
-echo "9. Verifying bpfman-rpc service..."
+echo "10. Verifying bpfman-rpc service..."
 echo ""
 echo "bpfman-rpc logs:"
 $PODMAN logs bpfman-demo-pod-bpfman --tail=10
 echo ""
 
 # Check socket exists
-echo "10. Checking gRPC socket..."
+echo "11. Checking gRPC socket..."
 if $PODMAN exec bpfman-demo-pod-bpfman test -S /run/bpfman-sock/bpfman.sock; then
     echo -e "${GREEN}✓ Socket exists and is ready${NC}"
     $PODMAN exec bpfman-demo-pod-bpfman ls -lh /run/bpfman-sock/
@@ -212,18 +234,18 @@ fi
 echo ""
 
 # Check BPF filesystem access
-echo "11. Verifying BPF filesystem access..."
+echo "12. Verifying BPF filesystem access..."
 $PODMAN exec bpfman-demo-pod-bpfman ls -lah /sys/fs/bpf/ | head -n 10
 echo ""
 
 # Check system capabilities
-echo "12. Verifying container capabilities..."
+echo "13. Verifying container capabilities..."
 echo "Checking privileged access:"
 $PODMAN exec bpfman-demo-pod-bpfman cat /proc/self/status | grep -E "Cap(Inh|Prm|Eff)" | head -3
 echo ""
 
 # Show mounted volumes
-echo "13. Verifying required mounts..."
+echo "14. Verifying required mounts..."
 echo "BPF filesystem:"
 $PODMAN exec bpfman-demo-pod-bpfman mount | grep bpf || echo "  Checking /sys/fs/bpf..."
 $PODMAN exec bpfman-demo-pod-bpfman ls -ld /sys/fs/bpf
@@ -236,12 +258,12 @@ $PODMAN exec bpfman-demo-pod-bpfman ls /lib/modules/ | head -3
 echo ""
 
 # Show network interfaces (bpfman will attach programs to these)
-echo "14. Available network interfaces (for eBPF attachment)..."
+echo "15. Available network interfaces (for eBPF attachment)..."
 $PODMAN exec bpfman-demo-pod-bpfman ip link show | grep -E "^[0-9]+:" | head -5
 echo ""
 
 # Show recent logs
-echo "15. Recent bpfman-rpc activity..."
+echo "16. Recent bpfman-rpc activity..."
 $PODMAN logs bpfman-demo-pod-bpfman --tail=15
 echo ""
 
