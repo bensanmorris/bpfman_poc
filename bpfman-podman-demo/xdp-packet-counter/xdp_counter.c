@@ -6,11 +6,26 @@
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/ipv6.h>
+#include <linux/in.h>
 #include <linux/icmp.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
+
+// Protocol constants (in case linux/in.h doesn't define them for BPF)
+#ifndef IPPROTO_ICMP
+#define IPPROTO_ICMP 1
+#endif
+#ifndef IPPROTO_TCP
+#define IPPROTO_TCP 6
+#endif
+#ifndef IPPROTO_UDP
+#define IPPROTO_UDP 17
+#endif
+#ifndef IPPROTO_ICMPV6
+#define IPPROTO_ICMPV6 58
+#endif
 
 // Packet statistics structure
 struct pkt_stats {

@@ -33,19 +33,50 @@ fi
 echo "   Target interface: $INTERFACE"
 echo ""
 
-# Clean up any previous version
-echo "2. Cleaning up previous version (if any)..."
+# Clean up any previous version - be thorough!
+echo "2. Cleaning up previous XDP programs (if any)..."
+
+# First, remove ANY XDP program from the target interface
+if sudo bpftool net show dev $INTERFACE 2>/dev/null | grep -q "xdp:"; then
+    echo "   Found existing XDP program on $INTERFACE - removing..."
+    sudo ip link set dev $INTERFACE xdp off 2>/dev/null || true
+    sudo ip link set dev $INTERFACE xdpgeneric off 2>/dev/null || true
+    sudo ip link set dev $INTERFACE xdpoffload off 2>/dev/null || true
+    sleep 1
+fi
+
+# Clean up old xdp_counter programs specifically
 if sudo bpftool prog show | grep -q xdp_counter; then
     PROG_ID=$(sudo bpftool prog show | grep xdp_counter | grep -oP '^\d+' | head -1)
     if [ ! -z "$PROG_ID" ]; then
-        echo "   Detaching program ID $PROG_ID..."
+        echo "   Detaching old xdp_counter program ID $PROG_ID..."
         sudo bpftool net detach xdp dev $INTERFACE 2>/dev/null || true
-        sudo ip link set dev $INTERFACE xdp off 2>/dev/null || true
-        sudo ip link set dev $INTERFACE xdpgeneric off 2>/dev/null || true
     fi
 fi
+
+# Clean up any old xdp_block_ping programs too
+if sudo bpftool prog show | grep -q xdp_block_ping; then
+    PROG_ID=$(sudo bpftool prog show | grep xdp_block_ping | grep -oP '^\d+' | head -1)
+    if [ ! -z "$PROG_ID" ]; then
+        echo "   Detaching old xdp_block_ping program ID $PROG_ID..."
+        sudo bpftool net detach xdp dev $INTERFACE 2>/dev/null || true
+    fi
+fi
+
+# Remove pinned objects
 sudo rm -f /sys/fs/bpf/xdp_counter 2>/dev/null || true
+sudo rm -f /sys/fs/bpf/xdp_block_ping 2>/dev/null || true
 sudo rm -f /sys/fs/bpf/stats_map 2>/dev/null || true
+
+# Final verification that XDP is clear
+sleep 1
+if sudo bpftool net show dev $INTERFACE 2>/dev/null | grep -q "xdp:"; then
+    echo -e "${RED}   ✗ Warning: XDP still attached, forcing removal...${NC}"
+    sudo ip link set dev $INTERFACE xdp off 2>/dev/null || true
+    sudo ip link set dev $INTERFACE xdpgeneric off 2>/dev/null || true
+    sleep 1
+fi
+
 echo -e "${GREEN}   ✓ Clean${NC}"
 echo ""
 

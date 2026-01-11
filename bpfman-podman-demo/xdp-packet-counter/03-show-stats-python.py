@@ -30,31 +30,51 @@ def find_stats_map():
     return None
 
 def read_map_data(map_id):
-    """Read raw bytes from BPF map"""
+    """Read statistics from BPF map"""
     try:
-        # Get map dump in hex format
+        # Try to get formatted output first (newer bpftool with BTF)
         result = subprocess.run(['sudo', 'bpftool', 'map', 'dump', 'id', map_id],
                               capture_output=True, text=True, check=True)
         
-        # Parse the hex output
-        # Format: "value: XX XX XX XX ..."
+        # Check if output is already formatted as JSON with BTF info
+        if result.stdout.strip().startswith('['):
+            import json
+            data = json.loads(result.stdout)
+            if data and 'value' in data[0]:
+                value = data[0]['value']
+                # Check if it's already a formatted dict (BTF enabled)
+                if isinstance(value, dict):
+                    return {
+                        'total_packets': value.get('total_packets', 0),
+                        'total_bytes': value.get('total_bytes', 0),
+                        'icmp_packets': value.get('icmp_packets', 0),
+                        'tcp_packets': value.get('tcp_packets', 0),
+                        'udp_packets': value.get('udp_packets', 0),
+                        'other_packets': value.get('other_packets', 0),
+                        'ipv4_packets': value.get('ipv4_packets', 0),
+                        'ipv6_packets': value.get('ipv6_packets', 0),
+                    }
+                # Otherwise parse hex array
+                elif isinstance(value, list):
+                    # Convert hex string array to bytes
+                    hex_bytes = ''.join(v.replace('0x', '') for v in value)
+                    data_bytes = bytes.fromhex(hex_bytes)
+                    return parse_stats_from_bytes(data_bytes)
+        
+        # Fallback: parse hex format
         for line in result.stdout.split('\n'):
             if 'value:' in line:
                 hex_str = line.split('value:')[1].strip()
-                # Remove spaces and convert to bytes
                 hex_bytes = hex_str.replace(' ', '')
-                # Convert hex string to bytes
                 data_bytes = bytes.fromhex(hex_bytes)
-                return data_bytes
-    except (subprocess.CalledProcessError, ValueError, IndexError) as e:
+                return parse_stats_from_bytes(data_bytes)
+                
+    except (subprocess.CalledProcessError, ValueError, IndexError, json.JSONDecodeError) as e:
         print(f"{RED}Error reading map: {e}{NC}", file=sys.stderr)
     return None
 
-def parse_stats(data_bytes):
-    """Parse the pkt_stats structure from bytes"""
-    # Structure: 8 x __u64 (little-endian)
-    # total_packets, total_bytes, icmp, tcp, udp, other, ipv4, ipv6
-    
+def parse_stats_from_bytes(data_bytes):
+    """Parse the pkt_stats structure from raw bytes"""
     if len(data_bytes) < 64:  # 8 * 8 bytes
         return None
     
@@ -125,16 +145,13 @@ def main():
         print("Run: ./02-load.sh")
         sys.exit(1)
     
-    # Read map data
-    data = read_map_data(map_id)
-    if not data:
-        print(f"{YELLOW}⚠ Could not read map data{NC}")
-        sys.exit(1)
-    
-    # Parse statistics
-    stats = parse_stats(data)
+    # Read map data (now returns stats directly or None)
+    stats = read_map_data(map_id)
     if not stats:
-        print(f"{RED}✗ Could not parse statistics{NC}")
+        print(f"{YELLOW}⚠ Could not read map data{NC}")
+        print()
+        print("Try running the diagnostic:")
+        print("  ./99-diagnose.sh")
         sys.exit(1)
     
     # Check if we have any data
