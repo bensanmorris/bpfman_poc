@@ -2,6 +2,8 @@
 
 Quick reference for extending disk space on RHEL9 virtual machines and installing OpenShift Local for development.
 
+![openshift local setup](openshift_local.png)
+
 ---
 
 ## Part A: Extending Disk Space on RHEL9 VM
