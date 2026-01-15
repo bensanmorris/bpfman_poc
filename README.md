@@ -4,6 +4,7 @@
 - **UPDATE:** [bpfman as a container demo added here](./bpfman-podman-demo/README.md)
 - **UPDATE:** [xdp packet counter demo added here (a good single machine demo)](./bpfman-podman-demo/xdp-packet-counter/README.md)
 - **UPDATE:** [xdp ping blocker demo added here (this demo requires 2 machines)](./bpfman-podman-demo/xdp-ping-blocker/README.md)
+- **UPDATE:** [openshift local setup and RHEL9 VM guide added here](RHEL9-OpenShift-Setup-README.md)
 
 # bpfman Proof of Concept – RHEL 9 (Minimal Setup)
 
