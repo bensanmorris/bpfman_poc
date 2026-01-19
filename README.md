@@ -217,8 +217,3 @@ At this point the system has:
 - ✅ clang/llvm toolchain
 - ✅ bpftool available
 - ✅ Ready for bpfman-managed eBPF programs
-
----
-
-- Proves OpenShift deployment requirements
-- Includes security approval documentation
