@@ -8,9 +8,7 @@
 
 ## In Progress:
 
-- **UPDATE:** [WIP - bpfman-operator (aka fleet management of eBPF)]()
 - **UPDATE:** [WIP - bpfman as a container demo added here](./bpfman-podman-demo/README.md)
-- **UPDATE:** [xdp ping blocker demo added here (this demo requires 2 machines)](./bpfman-podman-demo/xdp-ping-blocker/README.md)
 
 # bpfman Proof of Concept – RHEL 9 (Minimal Setup)
 
