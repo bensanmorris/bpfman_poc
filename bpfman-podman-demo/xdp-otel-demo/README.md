@@ -4,7 +4,7 @@ A production-ready demonstration of integrating eBPF/XDP packet counters with Op
 
 This extends your existing XDP packet counter by adding an OpenTelemetry exporter that reads BPF maps and exports comprehensive metrics with full protocol breakdown to Prometheus and Grafana.
 
-![VIDEO: A live capture of ebpf packet data being sent to a locally running OpenTelemetry backend](./ebpf_otel.webm)
+![VIDEO: A live capture of this demo showing ebpf packet data being sent to a locally running OpenTelemetry backend](./ebpf_otel.webm)
 
 ## 🎉 What You Get
 
