@@ -6,10 +6,6 @@
 - **UPDATE:** [xdp packet counter demo extended to forward eBPF data to otel](./bpfman-podman-demo/xdp-otel-demo/README.md)
 - **UPDATE:** [openshift local setup (pre-requisite for the bpfman-operator demo below)](RHEL9-OpenShift-Setup-README.md)
 
-## In Progress:
-
-- **UPDATE:** [WIP - bpfman as a container demo added here](./bpfman-podman-demo/README.md)
-
 # bpfman Proof of Concept – RHEL 9 (Minimal Setup)
 
 This README documents the **minimal, working setup steps** required to prepare a Red Hat Enterprise Linux 9 system for a **bpfman / eBPF proof of concept**.
