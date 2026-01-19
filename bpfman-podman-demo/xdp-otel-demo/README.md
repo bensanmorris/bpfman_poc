@@ -2,7 +2,7 @@
 
 A production-ready demonstration of integrating eBPF/XDP packet counters with OpenTelemetry on RHEL9.
 
-This extends your existing XDP packet counter by adding an OpenTelemetry exporter that reads BPF maps and exports comprehensive metrics with full protocol breakdown to Prometheus and Grafana.
+This extends the existing XDP packet counter by adding an OpenTelemetry exporter that reads BPF maps and exports comprehensive metrics with full protocol breakdown to Prometheus and Grafana.
 
 ![VIDEO: A live capture of this demo showing ebpf packet data being sent to a locally running OpenTelemetry backend](./ebpf_otel.gif)
 
@@ -412,14 +412,6 @@ xdp-otel-demo/
 ├── setup-rhel9.sh                  # Automated system setup
 ├── setup-venv.sh                   # Automated venv setup
 ├── README.md                       # This file
-├── QUICKSTART.md                   # Quick reference
-├── USING-YOUR-PROGRAM.md           # Guide for your XDP program
-├── PODMAN-COMMANDS.md              # Podman reference
-├── PODMAN-TROUBLESHOOTING.md       # Podman troubleshooting
-├── ARCHITECTURE.md                 # Detailed architecture diagrams
-├── RHEL9-SUMMARY.md                # RHEL9/Podman overview
-├── MANUAL-INSTALL.md               # Manual installation guide
-└── INDEX.md                        # Documentation index
 ```
 
 ## How It Works
