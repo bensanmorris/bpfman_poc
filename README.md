@@ -4,7 +4,7 @@
 - [Setting up a RHEL9 instance for eBPF (this page)](./README.md)
 - [xdp packet counter demo added here (a good single machine demo)](./bpfman-podman-demo/xdp-packet-counter/README.md)
 - [xdp packet counter demo extended to forward eBPF data to otel](./bpfman-podman-demo/xdp-otel-demo/README.md)
-- [openshift local setup (pre-requisite for the bpfman-operator demo below)](RHEL9-OpenShift-Setup-README.md)
+- [openshift local setup (pre-requisite for the bpfman-operator demo (WIP))](RHEL9-OpenShift-Setup-README.md)
 
 # bpfman Proof of Concept – RHEL 9 (Minimal Setup)
 
