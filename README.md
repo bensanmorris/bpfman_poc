@@ -1,10 +1,16 @@
-# Revision history
+# Contents
 
 - **UPDATE:** [eBPF use case list added here](./README_ebpf-use-cases-beyond-networking.md)
-- **UPDATE:** [bpfman as a container demo added here](./bpfman-podman-demo/README.md)
+- **UPDATE:** [Setting up a RHEL9 instance for eBPF (this page)](./README.md)
 - **UPDATE:** [xdp packet counter demo added here (a good single machine demo)](./bpfman-podman-demo/xdp-packet-counter/README.md)
+- **UPDATE:** [xdp packet counter demo extended to forward eBPF data to otel](./bpfman-podman-demo/xdp-otel-demo/README.md)
+- **UPDATE:** [openshift local setup (pre-requisite for the bpfman-operator demo below)](RHEL9-OpenShift-Setup-README.md)
+
+## In Progress:
+
+- **UPDATE:** [WIP - bpfman-operator (aka fleet management of eBPF)]()
+- **UPDATE:** [WIP - bpfman as a container demo added here](./bpfman-podman-demo/README.md)
 - **UPDATE:** [xdp ping blocker demo added here (this demo requires 2 machines)](./bpfman-podman-demo/xdp-ping-blocker/README.md)
-- **UPDATE:** [openshift local setup and RHEL9 VM guide added here](RHEL9-OpenShift-Setup-README.md)
 
 # bpfman Proof of Concept – RHEL 9 (Minimal Setup)
 

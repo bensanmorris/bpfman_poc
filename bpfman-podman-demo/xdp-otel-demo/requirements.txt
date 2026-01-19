@@ -1,0 +1,10 @@
+# OpenTelemetry dependencies
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-exporter-otlp-proto-grpc>=1.20.0
+
+# Optional: BCC for advanced map reading (if using xdp_otel_exporter.py)
+# bcc>=0.27.0
+
+# If on RHEL9, you might need:
+# pip install --break-system-packages opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
