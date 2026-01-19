@@ -21,7 +21,7 @@
 │  │  ┌──────────────────────────────────────────────────────────────┐  │   │
 │  │  │  BPF Maps (pinned at /sys/fs/bpf/)                           │  │   │
 │  │  │  ┌────────────────────────────────────────────────────────┐ │  │   │
-│  │  │  │ xdp_stats_map (hash map)                               │ │  │   │
+│  │  │  │ stats_map (hash map)                               │ │  │   │
 │  │  │  │   Key: 0 (global counter)                              │ │  │   │
 │  │  │  │   Value: {                                             │ │  │   │
 │  │  │  │     rx_packets: uint64                                 │ │  │   │
@@ -218,7 +218,7 @@ systemd
 └── *.md                           # Documentation
 
 /sys/fs/bpf/
-└── xdp_stats_map                  # Pinned BPF map
+└── stats_map                  # Pinned BPF map
 
 Podman volumes:
 ~/.local/share/containers/storage/volumes/

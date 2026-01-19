@@ -35,7 +35,7 @@
 1. Read: [RHEL9-SUMMARY.md](RHEL9-SUMMARY.md)
 2. Run: `./setup-rhel9.sh`
 3. Run: `podman-compose up -d`
-4. Run: `sudo python3 xdp_otel_exporter_simple.py --map-name xdp_stats_map`
+4. Run: `sudo python3 xdp_otel_exporter_simple.py --map-name stats_map`
 5. Open: http://localhost:3000
 
 ### "I'm having Podman problems"
@@ -79,10 +79,10 @@
 ### Python Exporters
 ```bash
 # Lightweight, uses bpftool (RECOMMENDED)
-python3 xdp_otel_exporter_simple.py --map-name xdp_stats_map
+python3 xdp_otel_exporter_simple.py --map-name stats_map
 
 # Advanced, uses BCC library
-python3 xdp_otel_exporter.py --map-path /sys/fs/bpf/xdp_stats_map
+python3 xdp_otel_exporter.py --map-path /sys/fs/bpf/stats_map
 ```
 
 ### Container Services

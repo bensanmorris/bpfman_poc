@@ -99,7 +99,7 @@ podman-compose ps
 ### Step 3: Run OpenTelemetry Exporter
 ```bash
 # Auto-discover the XDP map and export metrics
-sudo python3 xdp_otel_exporter_simple.py --map-name xdp_stats_map
+sudo python3 xdp_otel_exporter_simple.py --map-name stats_map
 ```
 
 **That's it!** Open http://localhost:3000 (Grafana) to see the metrics.
@@ -178,7 +178,7 @@ xdp-otel-demo/
 podman-compose up -d
 
 # Run exporter
-sudo python3 xdp_otel_exporter_simple.py --map-name xdp_stats_map
+sudo python3 xdp_otel_exporter_simple.py --map-name stats_map
 
 # View logs
 podman-compose logs -f

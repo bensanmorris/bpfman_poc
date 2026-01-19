@@ -119,7 +119,7 @@ echo "  3. Verify services are running:"
 echo "     podman-compose ps"
 echo
 echo "  4. Run the demo exporter:"
-echo "     sudo python3 xdp_otel_exporter_simple.py --map-name xdp_stats_map"
+echo "     sudo python3 xdp_otel_exporter_simple.py --map-name stats_map"
 echo
 echo "  5. Access services:"
 echo "     - Grafana: http://localhost:3000 (admin/admin)"

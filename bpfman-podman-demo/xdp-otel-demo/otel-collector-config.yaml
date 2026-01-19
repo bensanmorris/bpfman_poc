@@ -36,9 +36,9 @@ exporters:
     tls:
       insecure: true
   
-  # Debug exporter for troubleshooting
-  logging:
-    loglevel: info
+  # Debug exporter for troubleshooting (replaces deprecated 'logging')
+  debug:
+    verbosity: detailed
     sampling_initial: 5
     sampling_thereafter: 200
 
@@ -48,13 +48,13 @@ service:
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [prometheus, logging]
+      exporters: [prometheus, debug]
     
     # Traces pipeline (if you add tracing later)
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [otlp/jaeger, logging]
+      exporters: [otlp/jaeger, debug]
   
   telemetry:
     logs:

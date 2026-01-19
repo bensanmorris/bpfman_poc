@@ -6,7 +6,7 @@ This script reads packet statistics from the XDP BPF map and exports
 them to an OpenTelemetry backend (Prometheus, Jaeger, etc.)
 
 Usage:
-    python3 xdp_otel_exporter.py --map-path /sys/fs/bpf/xdp_stats_map --otel-endpoint localhost:4317
+    python3 xdp_otel_exporter.py --map-path /sys/fs/bpf/stats_map --otel-endpoint localhost:4317
 """
 
 import argparse
@@ -37,7 +37,7 @@ class XDPStatsExporter:
         Initialize the exporter
         
         Args:
-            map_path: Path to the pinned BPF map (e.g., /sys/fs/bpf/xdp_stats_map)
+            map_path: Path to the pinned BPF map (e.g., /sys/fs/bpf/stats_map)
             otel_endpoint: OpenTelemetry collector endpoint (e.g., localhost:4317)
             export_interval: How often to export metrics (seconds)
         """
@@ -109,7 +109,7 @@ class XDPStatsExporter:
             # This assumes the map is pinned at the specified path
             # The map structure should match the XDP program
             b = BPF()
-            stats_map = b.get_table("xdp_stats_map", pinned_path=self.map_path)
+            stats_map = b.get_table("stats_map", pinned_path=self.map_path)
             
             # Read stats (key=0 for single global counter)
             key = stats_map.Key(0)
@@ -185,8 +185,8 @@ def main():
     )
     parser.add_argument(
         "--map-path",
-        default="/sys/fs/bpf/xdp_stats_map",
-        help="Path to pinned BPF map (default: /sys/fs/bpf/xdp_stats_map)"
+        default="/sys/fs/bpf/stats_map",
+        help="Path to pinned BPF map (default: /sys/fs/bpf/stats_map)"
     )
     parser.add_argument(
         "--otel-endpoint",

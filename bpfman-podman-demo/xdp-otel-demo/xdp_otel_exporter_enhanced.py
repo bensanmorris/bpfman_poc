@@ -80,7 +80,7 @@ class BpftoolStatsReader:
     
     def read_stats(self):
         """
-        Read statistics from BPF map using bpftool
+        Read statistics from BPF map using bpftool JSON output
         
         Returns:
             dict: Full stats structure with protocol breakdown
@@ -90,53 +90,53 @@ class BpftoolStatsReader:
             return self._empty_stats()
         
         try:
-            # Dump map contents
+            # Dump map contents as JSON
             result = subprocess.run(
-                ["bpftool", "map", "dump", "id", str(map_id)],
+                ["bpftool", "map", "dump", "id", str(map_id), "-j"],
                 capture_output=True,
                 text=True,
                 check=True
             )
             
-            # Parse the output
-            # Looking for value line with hex bytes
-            # Structure: total_packets, total_bytes, icmp, tcp, udp, other, ipv4, ipv6
-            # Each field is 8 bytes (u64) = 64 bytes total
+            # Parse JSON output
+            import json
+            data = json.loads(result.stdout)
             
-            for line in result.stdout.split('\n'):
-                if 'value:' in line:
-                    # Extract hex bytes from value line
-                    value_part = line.split('value:')[1].strip()
-                    # Remove all spaces to get continuous hex string
-                    hex_bytes = value_part.replace(' ', '')
-                    
-                    # Parse struct pkt_stats (8 x u64 = 64 bytes)
-                    if len(hex_bytes) >= 128:  # 64 bytes = 128 hex chars
-                        # Convert hex string to bytes
-                        try:
-                            data = bytes.fromhex(hex_bytes[:128])
-                            # Unpack as 8 little-endian uint64 values
-                            values = struct.unpack('<8Q', data)
-                            
-                            return {
-                                'total_packets': values[0],
-                                'total_bytes': values[1],
-                                'icmp_packets': values[2],
-                                'tcp_packets': values[3],
-                                'udp_packets': values[4],
-                                'other_packets': values[5],
-                                'ipv4_packets': values[6],
-                                'ipv6_packets': values[7]
-                            }
-                        except Exception as e:
-                            logger.error(f"Error parsing map data: {e}")
-                            return self._empty_stats()
+            # bpftool returns an array with one entry for our map
+            # The entry has 'formatted' which contains the parsed values
+            if isinstance(data, list) and len(data) > 0:
+                entry = data[0]
+                
+                # Use 'formatted' field which has the parsed values
+                if isinstance(entry, dict) and 'formatted' in entry:
+                    formatted = entry['formatted']
+                    if 'value' in formatted:
+                        value = formatted['value']
+                        
+                        # value is now a dict with our field names
+                        return {
+                            'total_packets': value['total_packets'],
+                            'total_bytes': value['total_bytes'],
+                            'icmp_packets': value['icmp_packets'],
+                            'tcp_packets': value['tcp_packets'],
+                            'udp_packets': value['udp_packets'],
+                            'other_packets': value['other_packets'],
+                            'ipv4_packets': value['ipv4_packets'],
+                            'ipv6_packets': value['ipv6_packets']
+                        }
             
-            logger.warning("No value found in map output")
+            logger.warning(f"Unexpected data structure. Type: {type(data)}, Data: {data}")
             return self._empty_stats()
             
         except subprocess.CalledProcessError as e:
             logger.error(f"Error reading map: {e}")
+            return self._empty_stats()
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing JSON: {e}")
+            logger.debug(f"Output was: {result.stdout}")
+            return self._empty_stats()
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
             return self._empty_stats()
     
     def _empty_stats(self):

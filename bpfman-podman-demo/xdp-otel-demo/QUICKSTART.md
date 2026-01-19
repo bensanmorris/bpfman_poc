@@ -22,14 +22,14 @@ podman-compose up -d
 
 ```bash
 # 1. Find the XDP map ID
-bpftool map list | grep xdp_stats
-# Output: 123: hash  name xdp_stats_map ...
+bpftool map list | grep stats_map
+# Output: 123: hash  name stats_map ...
 
 # 2. Run the OpenTelemetry exporter
 sudo python3 xdp_otel_exporter_simple.py --map-id 123
 
 # OR auto-detect by name
-sudo python3 xdp_otel_exporter_simple.py --map-name xdp_stats_map
+sudo python3 xdp_otel_exporter_simple.py --map-name stats_map
 ```
 
 ## Viewing Metrics

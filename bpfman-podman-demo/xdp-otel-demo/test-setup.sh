@@ -94,7 +94,7 @@ if [ "$ALL_GOOD" = true ]; then
     echo
     echo "Next steps:"
     echo "  1. Start monitoring stack: podman-compose up -d"
-    echo "  2. Find the map ID: bpftool map list | grep xdp_stats"
+    echo "  2. Find the map ID: bpftool map list | grep stats_map"
     echo "  3. Run exporter: sudo python3 xdp_otel_exporter_simple.py --map-id <ID>"
     echo "  4. View metrics: http://localhost:3000"
 else

@@ -1,150 +1,262 @@
 # XDP Packet Counter → OpenTelemetry Demo
 
-A lightweight demonstration of integrating eBPF/XDP packet counters with OpenTelemetry on RHEL9.
+A production-ready demonstration of integrating eBPF/XDP packet counters with OpenTelemetry on RHEL9.
 
-This extends the existing XDP packet counter demo by adding an OpenTelemetry exporter that reads from the same BPF maps and forwards metrics to an OpenTelemetry backend.
+This extends your existing XDP packet counter by adding an OpenTelemetry exporter that reads BPF maps and exports comprehensive metrics with full protocol breakdown to Prometheus and Grafana.
+
+## 🎉 What You Get
+
+- ✅ **Total packet & byte counts** - Monitor overall traffic
+- ✅ **Protocol breakdown** - TCP, UDP, ICMP, Other packets
+- ✅ **IP version stats** - IPv4 vs IPv6 distribution  
+- ✅ **Real-time packet rate** - Packets per second
+- ✅ **Full observability stack** - OpenTelemetry → Prometheus → Grafana
+- ✅ **Podman-native** - Rootless containers on RHEL9
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  XDP Program (kernel)                            │
-│       ↓                                           │
-│  BPF Maps (packet_stats)                        │
-│       ↓                                           │
-│  Python/bpftool Scraper                         │
-│       ↓                                           │
-│  OpenTelemetry Exporter (NEW)                   │
-│       ↓                                           │
-│  OpenTelemetry Collector                        │
-│       ↓                                           │
-│  Prometheus → Grafana                            │
-└─────────────────────────────────────────────────┘
+XDP Program (kernel) - xdp_packet_counter
+Attached to: enp1s0
+      ↓
+BPF Map: stats_map (64 bytes, 8 × u64)
+  struct pkt_stats {
+    total_packets, total_bytes,
+    icmp_packets, tcp_packets, udp_packets,
+    other_packets, ipv4_packets, ipv6_packets
+  }
+      ↓
+OpenTelemetry Exporter (Python)
+  - Reads via: bpftool map dump -j
+  - Parses: entry['formatted']['value']
+  - Exports: 9 OpenTelemetry metrics
+      ↓
+OpenTelemetry Collector (:4317)
+  - OTLP gRPC receiver
+  - Batch processor
+  - Prometheus exporter (:8889)
+      ↓
+Prometheus (:9090)
+  - Time-series database
+  - 15s scrape interval
+  - PromQL query engine
+      ↓
+Grafana (:3000)
+  - Visualization dashboards
+  - Real-time monitoring
 ```
 
 ## Prerequisites
 
-### On RHEL9 Host:
+### System Requirements
+- **OS**: RHEL 9.x
+- **Kernel**: 5.14+ (with eBPF/XDP support)
+- **Tools**: bpftool, podman, python3
+- **XDP Program**: Your packet counter must be loaded and attached
+
+### Quick Check
 ```bash
-# Install required packages
-sudo dnf install -y python3 python3-pip bpftool
+# Verify XDP program is loaded
+sudo bpftool prog list | grep xdp
 
-# Install Python OpenTelemetry packages
-pip3 install --break-system-packages opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
+# Verify it's attached to an interface  
+sudo bpftool net show
 
-# The XDP program should already be loaded and running
-# Verify with: bpftool prog list
+# Verify the stats_map exists
+sudo bpftool map list | grep stats_map
+
+# Check current stats
+sudo bpftool map dump name stats_map -j
 ```
 
-### For OpenTelemetry Backend (Podman on RHEL9):
-```bash
-# Install podman and podman-compose
-sudo dnf install -y podman podman-compose
+## Installation
 
-# OR use the automated setup script
+### Option 1: Automated Setup (Recommended)
+
+```bash
+cd xdp-otel-demo/
+
+# 1. Install system dependencies and setup Podman
 ./setup-rhel9.sh
-```
 
-## Quick Start
+# 2. Setup Python virtual environment
+./setup-venv.sh
 
-### Step 1: Start OpenTelemetry Stack
-
-```bash
-# Start the monitoring stack (OTel Collector, Prometheus, Grafana)
+# 3. Start monitoring stack
 podman-compose up -d
 
-# Verify services are running
+# 4. Run the exporter
+sudo -E venv/bin/python3 xdp_otel_exporter_enhanced.py --map-name stats_map
+```
+
+### Option 2: Manual Setup
+
+```bash
+# 1. Install system packages
+sudo dnf install -y python3 python3-pip bpftool podman
+
+# 2. Install podman-compose via pip
+pip3 install --user podman-compose
+export PATH="$HOME/.local/bin:$PATH"
+
+# 3. Create Python virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# 4. Install OpenTelemetry packages
+pip install opentelemetry-api \
+            opentelemetry-sdk \
+            opentelemetry-exporter-otlp-proto-grpc
+
+# 5. Pull container images
+podman pull docker.io/otel/opentelemetry-collector:latest
+podman pull docker.io/prom/prometheus:latest
+podman pull docker.io/grafana/grafana:latest
+podman pull docker.io/jaegertracing/all-in-one:latest
+
+# 6. Start the stack
+podman-compose up -d
+```
+
+## Usage
+
+### Start the Monitoring Stack
+
+```bash
+cd xdp-otel-demo/
+
+# Start all services
+podman-compose up -d
+
+# Verify they're running (all should show "Up")
 podman-compose ps
 
-# View logs if needed
-podman-compose logs -f
+# Check logs if needed
+podman-compose logs -f otel-collector
 ```
 
-The following services will be available:
-- **OpenTelemetry Collector**: `localhost:4317` (gRPC), `localhost:4318` (HTTP)
-- **Prometheus**: `http://localhost:9090`
-- **Grafana**: `http://localhost:3000` (admin/admin)
-- **Jaeger** (optional): `http://localhost:16686`
-
-### Step 2: Run The XDP Program
+### Run the OpenTelemetry Exporter
 
 ```bash
-# Make sure the XDP packet counter is loaded and running
-# (Use the existing demo setup)
+# Activate virtual environment
+source venv/bin/activate
 
-# Verify the BPF map exists
-bpftool map list | grep xdp_stats
-
-# Example output:
-# 123: hash  name xdp_stats_map  flags 0x0
-#         key 4B  value 16B  max_entries 1  memlock 4096B
+# Run the exporter (reads stats_map and exports to OTel Collector)
+sudo -E venv/bin/python3 xdp_otel_exporter_enhanced.py --map-name stats_map
 ```
 
-### Step 3: Run the OpenTelemetry Exporter
+**Expected Output:**
+```
+2026-01-19 11:00:01 - __main__ - INFO - Found map 'stats_map' with ID 9
+2026-01-19 11:00:01 - __main__ - INFO - Enhanced XDP OpenTelemetry exporter initialized
+2026-01-19 11:00:01 - __main__ - INFO -   OTLP endpoint: localhost:4317
+2026-01-19 11:00:01 - __main__ - INFO -   Export interval: 10s
+2026-01-19 11:00:01 - __main__ - INFO - XDP OpenTelemetry exporter running...
+2026-01-19 11:00:02 - __main__ - INFO - Total: 6,180 pkts, 3,884,415 bytes | IPv4: 4,561, IPv6: 3 | TCP: 4,106, UDP: 408, ICMP: 50, Other: 1,616 | Rate: 123.45 pps
+```
+
+### View Metrics in Grafana
+
+1. **Open Grafana**: http://localhost:3000
+2. **Login**: admin / admin (change password on first login)
+3. **Navigate**: Explore → Select "Prometheus" datasource
+4. **Query Examples**:
+
+```promql
+# Total packet rate
+rate(xdp_xdp_packets_total[1m])
+
+# TCP packet rate
+rate(xdp_xdp_packets_tcp[1m])
+
+# UDP packet rate
+rate(xdp_xdp_packets_udp[1m])
+
+# ICMP packet rate
+rate(xdp_xdp_packets_icmp[1m])
+
+# Bandwidth (bytes/sec)
+rate(xdp_xdp_bytes_total[1m])
+
+# TCP percentage of total traffic
+(rate(xdp_xdp_packets_tcp[5m]) / rate(xdp_xdp_packets_total[5m])) * 100
+
+# IPv6 adoption percentage
+(rate(xdp_xdp_packets_ipv6[5m]) / rate(xdp_xdp_packets_total[5m])) * 100
+
+# Protocol breakdown - stacked area chart
+rate(xdp_xdp_packets_tcp[1m])
++ rate(xdp_xdp_packets_udp[1m])
++ rate(xdp_xdp_packets_icmp[1m])
++ rate(xdp_xdp_packets_other[1m])
+```
+
+## Metrics Exported
+
+The enhanced exporter sends **9 metrics** to OpenTelemetry:
+
+| Metric Name | Type | Unit | Description | PromQL Name |
+|-------------|------|------|-------------|-------------|
+| `xdp.packets.total` | Counter | packets | Total packets processed | `xdp_xdp_packets_total` |
+| `xdp.bytes.total` | Counter | bytes | Total bytes processed | `xdp_xdp_bytes_total` |
+| `xdp.packets.tcp` | Counter | packets | TCP packets | `xdp_xdp_packets_tcp` |
+| `xdp.packets.udp` | Counter | packets | UDP packets | `xdp_xdp_packets_udp` |
+| `xdp.packets.icmp` | Counter | packets | ICMP packets | `xdp_xdp_packets_icmp` |
+| `xdp.packets.other` | Counter | packets | Other protocol packets | `xdp_xdp_packets_other` |
+| `xdp.packets.ipv4` | Counter | packets | IPv4 packets | `xdp_xdp_packets_ipv4` |
+| `xdp.packets.ipv6` | Counter | packets | IPv6 packets | `xdp_xdp_packets_ipv6` |
+| `xdp.packets.rate` | Gauge | packets/sec | Packet processing rate | `xdp_xdp_packets_rate` |
+
+**Resource Attributes:**
+- `service.name`: xdp-packet-counter
+- `deployment.environment`: demo
+
+## Advanced Usage
+
+### Custom Export Interval
 
 ```bash
-# Find the map ID
-MAP_ID=$(bpftool map list | grep xdp_stats | awk -F: '{print $1}')
-
-# Run the exporter
-sudo python3 xdp_otel_exporter_simple.py \
-    --map-id $MAP_ID \
-    --otel-endpoint localhost:4317 \
+# Export every 5 seconds (default is 10)
+sudo -E venv/bin/python3 xdp_otel_exporter_enhanced.py \
+    --map-name stats_map \
     --interval 5
 ```
 
-You should see output like:
-```
-2025-01-13 10:30:45 - __main__ - INFO - XDP OpenTelemetry exporter initialized
-2025-01-13 10:30:45 - __main__ - INFO -   OTLP endpoint: localhost:4317
-2025-01-13 10:30:45 - __main__ - INFO -   Export interval: 5s
-2025-01-13 10:30:45 - __main__ - INFO - XDP OpenTelemetry exporter running...
-2025-01-13 10:30:46 - __main__ - INFO - Stats - Packets: 1,234, Bytes: 567,890, Rate: 123.45 pkt/s
-```
+### Custom OpenTelemetry Endpoint
 
-### Step 4: View Metrics in Grafana
-
-1. Open Grafana: `http://localhost:3000`
-2. Login with `admin/admin`
-3. Go to **Explore** → Select **Prometheus** datasource
-4. Query examples:
-   ```promql
-   # Total packets
-   xdp_xdp_packets_total
-   
-   # Packet rate
-   rate(xdp_xdp_packets_total[1m])
-   
-   # Bytes per second
-   rate(xdp_xdp_bytes_total[1m])
-   ```
-
-## Usage Examples
-
-### Basic Usage
 ```bash
-# Using map name (auto-discovers map ID)
-sudo python3 xdp_otel_exporter_simple.py --map-name xdp_stats_map
-
-# Using explicit map ID
-sudo python3 xdp_otel_exporter_simple.py --map-id 123
-
-# Custom OTel endpoint
-sudo python3 xdp_otel_exporter_simple.py \
-    --map-name xdp_stats_map \
+# Send to remote collector
+sudo -E venv/bin/python3 xdp_otel_exporter_enhanced.py \
+    --map-name stats_map \
     --otel-endpoint remote-collector.example.com:4317
-
-# Faster export interval (2 seconds)
-sudo python3 xdp_otel_exporter_simple.py \
-    --map-name xdp_stats_map \
-    --interval 2
 ```
 
-### Running as a Service
-
-Create a systemd service for continuous monitoring:
+### Debug Mode
 
 ```bash
+# See detailed parsing and JSON structure
+sudo -E venv/bin/python3 xdp_otel_exporter_enhanced.py \
+    --map-name stats_map \
+    --debug
+```
+
+### Using Map ID Instead of Name
+
+```bash
+# Find map ID
+MAP_ID=$(sudo bpftool map list | grep stats_map | awk -F: '{print $1}')
+
+# Use explicit ID
+sudo -E venv/bin/python3 xdp_otel_exporter_enhanced.py \
+    --map-id $MAP_ID
+```
+
+## Running as a Systemd Service
+
+For production deployments, run the exporter as a systemd service:
+
+```bash
+# Create service file (adjust paths for your system)
 sudo tee /etc/systemd/system/xdp-otel-exporter.service > /dev/null <<EOF
 [Unit]
 Description=XDP Packet Counter OpenTelemetry Exporter
@@ -153,8 +265,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/path/to/xdp-otel-demo
-ExecStart=/usr/bin/python3 /path/to/xdp-otel-demo/xdp_otel_exporter_simple.py --map-name xdp_stats_map --otel-endpoint localhost:4317
+WorkingDirectory=/home/benm/xdp-otel-demo
+ExecStart=/home/benm/xdp-otel-demo/venv/bin/python3 /home/benm/xdp-otel-demo/xdp_otel_exporter_enhanced.py --map-name stats_map
 Restart=always
 RestartSec=10
 
@@ -162,174 +274,231 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
+# Enable and start
 sudo systemctl daemon-reload
 sudo systemctl enable xdp-otel-exporter
 sudo systemctl start xdp-otel-exporter
+
+# Check status
 sudo systemctl status xdp-otel-exporter
+
+# View logs
+sudo journalctl -u xdp-otel-exporter -f
 ```
 
-## Metrics Exported
+## Generating Test Traffic
 
-The exporter sends these metrics to OpenTelemetry:
+To see your metrics change, generate some network traffic:
 
-| Metric Name | Type | Unit | Description |
-|-------------|------|------|-------------|
-| `xdp.packets.total` | Counter | packets | Total packets processed by XDP |
-| `xdp.bytes.total` | Counter | bytes | Total bytes processed by XDP |
-| `xdp.packets.rate` | Gauge | packets/sec | Current packet processing rate |
+```bash
+# ICMP traffic (will show in icmp_packets)
+ping -c 100 8.8.8.8
 
-All metrics include resource attributes:
-- `service.name`: xdp-packet-counter
-- `deployment.environment`: demo
+# TCP traffic (will show in tcp_packets)
+curl http://example.com
+wget http://releases.ubuntu.com/20.04/ubuntu-20.04.6-desktop-amd64.iso
+
+# UDP traffic (will show in udp_packets)
+dig @8.8.8.8 google.com
+nslookup example.com 8.8.8.8
+
+# Mixed traffic script
+cat > generate-traffic.sh << 'SCRIPT'
+#!/bin/bash
+echo "Generating mixed traffic..."
+while true; do
+    ping -c 5 8.8.8.8 > /dev/null 2>&1 &
+    curl -s http://example.com > /dev/null 2>&1 &
+    dig @8.8.8.8 google.com > /dev/null 2>&1 &
+    echo "Batch sent... ($(date +%H:%M:%S))"
+    sleep 2
+done
+SCRIPT
+chmod +x generate-traffic.sh
+./generate-traffic.sh
+```
 
 ## Troubleshooting
 
-### Exporter can't find BPF map
+### Exporter shows "Map not found"
+
 ```bash
-# List all BPF maps
-bpftool map list
+# Check if map exists
+sudo bpftool map list | grep stats
 
-# Check if the XDP program is loaded
-bpftool prog list | grep xdp
+# If not found, verify XDP program is loaded
+sudo bpftool prog list | grep xdp
+sudo bpftool net show
 
-# Verify map is pinned
-ls -la /sys/fs/bpf/
+# Load your XDP program if needed
 ```
 
-### Can't connect to OpenTelemetry Collector
-```bash
-# Check if OTel collector is running
-podman-compose ps otel-collector
+### Exporter shows all zeros
 
-# Check collector logs
+```bash
+# Check if map has data
+sudo bpftool map dump name stats_map -j
+
+# If all zeros, XDP program isn't processing packets
+# Verify it's attached to the correct interface
+sudo bpftool net show
+
+# Generate traffic on that interface
+ping -c 10 <interface-ip>
+```
+
+### OTel Collector not starting
+
+```bash
+# Check logs
 podman-compose logs otel-collector
 
-# Test connectivity
-nc -zv localhost 4317
+# Common issue: deprecated 'logging' exporter
+# The otel-collector-config.yaml should use 'debug' not 'logging'
+
+# Restart after fix
+podman-compose restart otel-collector
 ```
 
-### No metrics in Prometheus
-```bash
-# Check OTel Collector metrics endpoint
-curl http://localhost:8889/metrics
-
-# Check Prometheus targets
-# Open http://localhost:9090/targets
-```
-
-### Permission denied errors
-```bash
-# The exporter needs root/CAP_BPF to read BPF maps
-sudo python3 xdp_otel_exporter_simple.py ...
-
-# Check SELinux if on RHEL9
-sudo getenforce
-sudo ausearch -m avc -ts recent
-```
-
-## Integration with Existing Demo
-
-This exporter is designed to work alongside the existing scrapers:
+### "No module named opentelemetry"
 
 ```bash
-# Terminal 1: The existing Python bpftool scraper
-python3 the_existing_scraper.py
+# Make sure venv is activated
+source venv/bin/activate
 
-# Terminal 2: The existing libbpf scraper
-./the_libbpf_scraper
+# Verify packages are installed
+pip list | grep opentelemetry
 
-# Terminal 3: New OpenTelemetry exporter
-sudo python3 xdp_otel_exporter_simple.py --map-name xdp_stats_map
+# Reinstall if needed
+pip install opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
+
+# IMPORTANT: Use sudo -E to preserve venv environment
+sudo -E venv/bin/python3 xdp_otel_exporter_enhanced.py --map-name stats_map
 ```
 
-All three can read from the same BPF map simultaneously!
+### Grafana shows no data
+
+```bash
+# 1. Verify exporter is running and sending metrics
+# Check exporter output shows packet counts increasing
+
+# 2. Verify OTel Collector is receiving metrics
+podman-compose logs otel-collector | grep -i metric
+
+# 3. Verify Prometheus is scraping
+curl http://localhost:8889/metrics | grep xdp
+
+# 4. Check Prometheus UI
+firefox http://localhost:9090
+# Query: xdp_xdp_packets_total
+
+# 5. Verify Grafana datasource
+# Settings → Data Sources → Prometheus
+# URL should be: http://prometheus:9090
+```
+
+## Project Structure
+
+```
+xdp-otel-demo/
+├── xdp_otel_exporter_enhanced.py  # Main exporter (protocol breakdown)
+├── docker-compose.yml              # Monitoring stack definition
+├── otel-collector-config.yaml     # OTel Collector configuration
+├── prometheus.yml                  # Prometheus scrape config
+├── grafana-datasources.yml         # Grafana datasource
+├── requirements.txt                # Python dependencies
+├── setup-rhel9.sh                  # Automated system setup
+├── setup-venv.sh                   # Automated venv setup
+├── README.md                       # This file
+├── QUICKSTART.md                   # Quick reference
+├── USING-YOUR-PROGRAM.md           # Guide for your XDP program
+├── PODMAN-COMMANDS.md              # Podman reference
+├── PODMAN-TROUBLESHOOTING.md       # Podman troubleshooting
+├── ARCHITECTURE.md                 # Detailed architecture diagrams
+├── RHEL9-SUMMARY.md                # RHEL9/Podman overview
+├── MANUAL-INSTALL.md               # Manual installation guide
+└── INDEX.md                        # Documentation index
+```
+
+## How It Works
+
+1. **XDP Program** (kernel space)
+   - Processes packets at the network driver level
+   - Updates `stats_map` with packet counts per protocol
+
+2. **BPF Map** (`stats_map`)
+   - Array map with 1 entry (key=0)
+   - Value is 64 bytes (8 × uint64 fields)
+   - Shared between kernel and userspace
+
+3. **OpenTelemetry Exporter** (Python)
+   - Reads map using `bpftool map dump -j`
+   - Parses JSON: `entry['formatted']['value']`
+   - Converts to OpenTelemetry metrics
+   - Sends via OTLP gRPC to collector
+
+4. **OpenTelemetry Collector**
+   - Receives OTLP on port 4317
+   - Batches metrics for efficiency
+   - Exports to Prometheus endpoint on 8889
+
+5. **Prometheus**
+   - Scrapes OTel Collector every 15s
+   - Stores time-series data
+   - Provides PromQL query engine
+
+6. **Grafana**
+   - Visualizes Prometheus metrics
+   - Real-time dashboards
+   - Alerting capabilities
 
 ## Production Considerations
 
-For production use on RHEL9, consider:
+### Security
+- [ ] Enable TLS for OTLP endpoint
+- [ ] Use authentication for Grafana
+- [ ] Run exporter as non-root user (with CAP_BPF)
+- [ ] Restrict container network access
 
-1. **TLS/Authentication**: Enable TLS in `otel-collector-config.yaml`
-   ```yaml
-   exporters:
-     otlp:
-       endpoint: collector.example.com:4317
-       tls:
-         cert_file: /path/to/cert.pem
-         key_file: /path/to/key.pem
-   ```
+### Performance
+- [ ] Adjust export interval based on traffic volume
+- [ ] Configure Prometheus retention policies
+- [ ] Set resource limits in docker-compose.yml
+- [ ] Monitor exporter CPU/memory usage
 
-2. **Resource Limits**: Set appropriate CPU/memory limits
-3. **High Availability**: Run multiple collector instances with load balancing
-4. **Retention**: Configure Prometheus retention policies
-5. **Security**: Use least-privilege service accounts
+### Reliability
+- [ ] Set up systemd service for exporter
+- [ ] Configure automatic container restart
+- [ ] Set up Prometheus/Grafana data backups
+- [ ] Configure alerting rules for anomalies
 
-## Extending the Demo
-
-### Add Custom Metrics
-Modify the exporter to track additional statistics:
-
-```python
-# Add per-protocol counters
-self.meter.create_observable_counter(
-    name="xdp.tcp.packets",
-    callbacks=[self._get_tcp_count],
-    ...
-)
-```
-
-### Add Distributed Tracing
-Export trace spans for packet processing:
-
-```python
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-
-# Create spans for packet processing events
-with tracer.start_as_current_span("packet_process"):
-    # The packet handling logic
-    pass
-```
-
-### Send to Cloud Backends
-Configure different exporters in `otel-collector-config.yaml`:
-
-```yaml
-exporters:
-  # Send to Datadog
-  datadog:
-    api_key: "${DD_API_KEY}"
-    site: datadoghq.com
-  
-  # Send to New Relic
-  otlp/newrelic:
-    endpoint: otlp.nr-data.net:4317
-    headers:
-      api-key: "${NEW_RELIC_API_KEY}"
-```
-
-## Files in This Demo
-
-- `xdp_otel_exporter_simple.py`: Main exporter using bpftool (recommended)
-- `xdp_otel_exporter.py`: Alternative exporter using BCC library
-- `docker-compose.yml`: Complete monitoring stack (Podman/Docker compatible)
-- `otel-collector-config.yaml`: OpenTelemetry Collector configuration
-- `prometheus.yml`: Prometheus scrape configuration
-- `grafana-datasources.yml`: Grafana datasource provisioning
-- `requirements.txt`: Python dependencies
-- `setup-rhel9.sh`: Automated setup script for RHEL9
-- `test-setup.sh`: Verification script
-- `PODMAN-COMMANDS.md`: Podman command reference
-- `PODMAN-TROUBLESHOOTING.md`: Podman troubleshooting guide
+### Observability
+- [ ] Add custom Grafana dashboards
+- [ ] Set up alerts for traffic anomalies
+- [ ] Export to additional backends (Jaeger, Datadog, etc.)
+- [ ] Add more metrics from your XDP program
 
 ## References
 
 - [OpenTelemetry Python SDK](https://opentelemetry.io/docs/languages/python/)
 - [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
+- [PromQL Basics](https://prometheus.io/docs/prometheus/latest/querying/basics/)
 - [RHEL9 eBPF Documentation](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_networking/assembly_understanding-the-ebpf-features-in-rhel-9_configuring-and-managing-networking)
-- [RHEL9 Podman Documentation](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/building_running_and_managing_containers/)
 - [bpftool Documentation](https://man7.org/linux/man-pages/man8/bpftool.8.html)
-- [Rootless Podman Guide](https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md)
+- [Rootless Podman](https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md)
+
+## Contributing
+
+This demo was created to showcase XDP integration with modern observability tools. Feel free to:
+- Add more metrics from your XDP program
+- Create custom Grafana dashboards
+- Extend to other protocols
+- Add alerting rules
 
 ## License
 
-Same as the existing XDP packet counter demo.
+Same as your existing XDP packet counter demo.
+
+---
+
+**🎉 Congratulations!** You now have a complete eBPF/XDP observability pipeline with protocol-level insights exported to industry-standard monitoring tools!

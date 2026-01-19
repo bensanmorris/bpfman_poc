@@ -61,7 +61,7 @@ class BpftoolStatsReader:
             
             for line in result.stdout.split('\n'):
                 if self.map_name in line:
-                    # Parse line like: "123: hash  name xdp_stats_map  ..."
+                    # Parse line like: "123: hash  name stats_map  ..."
                     map_id = line.split(':')[0]
                     logger.info(f"Found map '{self.map_name}' with ID {map_id}")
                     return int(map_id)
@@ -187,7 +187,8 @@ class XDPOtelExporter:
         self.current_stats = {"packets": 0, "bytes": 0}
         self.prev_packets = 0
         self.prev_time = time.time()
-        
+        self.current_rate = 0.0
+
         logger.info("XDP OpenTelemetry exporter initialized")
         logger.info(f"  OTLP endpoint: {otel_endpoint}")
         logger.info(f"  Export interval: {export_interval}s")
@@ -250,8 +251,8 @@ def main():
     )
     parser.add_argument(
         "--map-name",
-        default="xdp_stats_map",
-        help="BPF map name (default: xdp_stats_map)"
+        default="stats_map",
+        help="BPF map name (default: stats_map)"
     )
     parser.add_argument(
         "--otel-endpoint",
