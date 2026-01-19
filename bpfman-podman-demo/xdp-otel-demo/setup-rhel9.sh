@@ -34,7 +34,7 @@ echo "Step 2: Installing podman-compose via pip..."
 # podman-compose is not in RHEL9 repos, install via pip
 if ! command -v podman-compose &> /dev/null; then
     echo "Installing podman-compose via pip..."
-    pip3 install --break-system-packages podman-compose
+    pip3 install podman-compose
     
     # Add user's local bin to PATH if not already there
     if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -47,7 +47,7 @@ fi
 
 echo
 echo "Step 3: Installing Python OpenTelemetry packages..."
-pip3 install --break-system-packages \
+pip3 install \
     opentelemetry-api \
     opentelemetry-sdk \
     opentelemetry-exporter-otlp-proto-grpc

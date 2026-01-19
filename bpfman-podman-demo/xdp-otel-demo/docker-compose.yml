@@ -14,8 +14,6 @@ services:
       - "8889:8889"   # Prometheus metrics exporter
     networks:
       - monitoring
-    # Podman rootless compatibility
-    userns_mode: "keep-id"
 
   # Prometheus for metrics storage
   prometheus:
@@ -31,8 +29,6 @@ services:
       - "9090:9090"
     networks:
       - monitoring
-    # Podman rootless compatibility
-    userns_mode: "keep-id"
 
   # Grafana for visualization
   grafana:
@@ -52,8 +48,6 @@ services:
       - monitoring
     depends_on:
       - prometheus
-    # Podman rootless compatibility
-    userns_mode: "keep-id"
 
   # Jaeger for distributed tracing (optional)
   jaeger:
@@ -66,8 +60,6 @@ services:
       - "14250:14250"  # Jaeger gRPC
     networks:
       - monitoring
-    # Podman rootless compatibility
-    userns_mode: "keep-id"
 
 networks:
   monitoring:
